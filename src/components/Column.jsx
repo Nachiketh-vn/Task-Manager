@@ -14,7 +14,7 @@ export default function Column({ column, tasks }) {
     <div
       className={`flex w-80 flex-col rounded-lg border-2 ${
         column.title === "Delete"
-          ? "border-red-300 w-60  border-dotted bg-red-100"
+          ? "border-red-300 w-48  border-dotted bg-red-100"
           : "border-blue-300"
       } p-4`}
     >

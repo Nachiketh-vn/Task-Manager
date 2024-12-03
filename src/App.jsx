@@ -2,7 +2,10 @@ import React, { useState } from "react";
 import Navbar from "./components/Navbar";
 import { DndContext } from "@dnd-kit/core";
 import Column from "./components/Column";
+import { MdMenu, MdClose } from "react-icons/md";
 import { MdFormatListBulletedAdd } from "react-icons/md";
+import { useDispatch, useSelector } from "react-redux";
+import { addTask, deleteTask, updateTaskStatus } from "./redux/taskSlice";
 
 const COLUMNS = [
   { id: "TODO", title: "To Do" },
@@ -11,60 +14,28 @@ const COLUMNS = [
   { id: "DELETE", title: "Delete" },
 ];
 
-const INITIAL_TASKS = [
-  {
-    id: "1",
-    title: "Research Project",
-    description: "Gather requirements and create initial documentation",
-    status: "TODO",
-  },
-  {
-    id: "2",
-    title: "Design System",
-    description: "Create component library and design tokens",
-    status: "TODO",
-  },
-  {
-    id: "3",
-    title: "API Integration",
-    description: "Implement REST API endpoints",
-    status: "IN_PROGRESS",
-  },
-  {
-    id: "4",
-    title: "Testing",
-    description: "Write unit tests for core functionality",
-    status: "DONE",
-  },
-];
-
 const App = () => {
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
-  const [showForm, setShowForm] = useState(false); // For controlling the popup visibility
-  const [newTask, setNewTask] = useState({
-    title: "",
-    description: "",
-  });
+  const tasks = useSelector((state) => state.tasks.tasks);
+  const dispatch = useDispatch();
+
+  const [showForm, setShowForm] = useState(false);
+  const [newTask, setNewTask] = useState({ title: "", description: "" });
   const [selectedFilter, setSelectedFilter] = useState("ALL");
+  const [isNavbarOpen, setIsNavbarOpen] = useState(true); 
+  const [searchTerm, setSearchTerm] = useState(""); 
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
-
     if (!over) return;
 
     const taskId = active.id;
     const newStatus = over.id;
 
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              status: newStatus,
-            }
-          : task
-      )
-    );
+    dispatch(updateTaskStatus({ taskId, status: newStatus }));
+  };
+
+  const handleDeleteTask = (taskId) => {
+    dispatch(deleteTask(taskId));
   };
 
   const handleAddTaskClick = () => {
@@ -79,7 +50,7 @@ const App = () => {
       description: newTask.description,
       status: "TODO",
     };
-    setTasks((prevTasks) => [...prevTasks, newTaskData]);
+    dispatch(addTask(newTaskData));
     setNewTask({ title: "", description: "" });
     setShowForm(false);
   };
@@ -92,118 +63,183 @@ const App = () => {
     }));
   };
 
+  const handleCancel = (e) => {
+    e.preventDefault();
+    setNewTask({ title: "", description: "" });
+    setShowForm(false);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
   const filteredColumns =
     selectedFilter === "ALL"
       ? COLUMNS
       : COLUMNS.filter((column) => column.id === selectedFilter);
 
+  // Filter tasks based on search term
+  const filteredTasks = tasks.filter(
+    (task) =>
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="flex h-screen">
-      {/* Vertical Navbar */}
-      <div className="w-64 bg-gray-800 text-white flex flex-col">
-        <h2 className="text-2xl font-semibold px-6 py-4">Task Filters</h2>
-        <nav className="flex flex-col gap-2 px-4">
-          <button
-            className={`text-left px-4 py-2 rounded-lg ${
-              selectedFilter === "ALL" ? "bg-blue-500" : "hover:bg-gray-700"
-            }`}
-            onClick={() => setSelectedFilter("ALL")}
-          >
-            All Tasks
-          </button>
-          {COLUMNS.map((column) => (
-            <button
-              key={column.id}
-              className={`text-left px-4 py-2 rounded-lg ${
-                selectedFilter === column.id
-                  ? "bg-blue-500"
-                  : "hover:bg-gray-700"
-              }`}
-              onClick={() => setSelectedFilter(column.id)}
+      {/* Toggleable Vertical Navbar */}
+      <div
+        className={`transition-all duration-300 ${
+          isNavbarOpen ? "w-64" : "w-16"
+        } bg-gray-800 text-white flex flex-col`}
+      >
+        {/* Navbar Header with Toggle Button */}
+        <div className="flex justify-between items-center px-4 py-4 border-b border-gray-700">
+          {/* Navbar Title */}
+          {isNavbarOpen && (
+            <h2
+              className={`text-xl font-semibold transition-opacity duration-300`}
             >
-              {column.title}
+              Task Filters
+            </h2>
+          )}
+
+          {/* Navbar Toggle Button */}
+          <button
+            onClick={() => setIsNavbarOpen(!isNavbarOpen)}
+            className="text-white focus:outline-none"
+          >
+            {isNavbarOpen ? <MdClose size={24} /> : <MdMenu size={24} />}
+          </button>
+        </div>
+
+        {/* Navbar Filters */}
+        {isNavbarOpen && (
+          <nav className="flex flex-col gap-2 px-4 mt-4">
+            <button
+              className={`text-left px-4 py-2 rounded-lg ${
+                selectedFilter === "ALL" ? "bg-blue-500" : "hover:bg-gray-700"
+              }`}
+              onClick={() => setSelectedFilter("ALL")}
+            >
+              {isNavbarOpen && "All Tasks"}
             </button>
-          ))}
-        </nav>
+            {COLUMNS.map((column) => {
+              if (column.title !== "Delete") {
+                return (
+                  <button
+                    key={column.id}
+                    className={`text-left px-4 py-2 rounded-lg ${
+                      selectedFilter === column.id
+                        ? "bg-blue-500"
+                        : "hover:bg-gray-700"
+                    }`}
+                    onClick={() => setSelectedFilter(column.id)}
+                  >
+                    {isNavbarOpen && column.title}
+                  </button>
+                );
+              }
+              return null; // Ensure a value is returned for every iteration
+            })}
+          </nav>
+        )}
       </div>
 
       {/* Main Content */}
-      <div>
-        <Navbar />
-        <div className="flex-1 p-4">
-          <div>
-            <button
-              className="border-[#5de7fa] border-2 hover:bg-[#5de7fa] hover:border-[#348d99] px-4 flex justify-center items-center gap-1 py-2 rounded-full"
-              onClick={handleAddTaskClick}
-            >
-              <p>Add Task</p> <MdFormatListBulletedAdd className="text-lg" />
-            </button>
+      <div className="flex-1 flex flex-col">
+        {/* Navbar */}
+        <div className="h-16 bg-white shadow-md">
+          <Navbar />
+        </div>
 
-            {/* Pop-up Form */}
-            {showForm && (
-              <div className="fixed inset-0 flex justify-center items-center bg-gray-700 bg-opacity-50 z-50">
-                <div className="bg-white p-6 rounded-lg w-80">
-                  <h2 className="text-xl mb-4">Add a New Task</h2>
-                  <form onSubmit={handleFormSubmit}>
-                    <div className="mb-4">
-                      <label className="block mb-2">Task Title</label>
-                      <input
-                        type="text"
-                        name="title"
-                        value={newTask.title}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        required
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <label className="block mb-2">Task Description</label>
-                      <textarea
-                        name="description"
-                        value={newTask.description}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <h1 className="text-sm relative -top-2 text-gray-500">
-                        This task will be added in To-Do tasks.
-                      </h1>
-                    </div>
-                    <div className="flex justify-between">
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
-                      >
-                        Add Task
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowForm(false)}
-                        className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-md"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                </div>
+        {/* Content */}
+        <div className="flex-1 p-4 overflow-auto">
+          {/* Search Bar */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search Tasks..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="w-full p-2 border border-gray-500 rounded-md"
+            />
+          </div>
+
+          <button
+            className="border-[#5de7fa] border-2 hover:bg-[#5de7fa] hover:border-[#348d99] px-4 flex justify-center items-center gap-1 py-2 mb-4 rounded-full"
+            onClick={handleAddTaskClick}
+          >
+            <p>Add Task</p> <MdFormatListBulletedAdd className="text-lg" />
+          </button>
+
+          {/* Pop-up Form */}
+          {showForm && (
+            <div className="fixed inset-0 flex justify-center items-center bg-gray-700 bg-opacity-50 z-50">
+              <div className="bg-white p-6 rounded-lg w-80">
+                <h2 className="text-xl mb-4">Add a New Task</h2>
+                <form onSubmit={handleFormSubmit}>
+                  <div className="mb-4">
+                    <label className="block mb-2">Task Title</label>
+                    <input
+                      type="text"
+                      name="title"
+                      value={newTask.title}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-2">Task Description</label>
+                    <textarea
+                      name="description"
+                      value={newTask.description}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    ></textarea>
+                  </div>
+                  <div className="flex justify-between">
+                    {/* Add Task Button */}
+                    <button
+                      type="submit"
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md"
+                    >
+                      Add Task
+                    </button>
+                    {/* Cancel Button */}
+                    <button
+                      type="button"
+                      onClick={handleCancel} // Close the modal when clicked
+                      className="bg-gray-400 text-white px-4 py-2 rounded-md"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Task Columns */}
-            <div className="flex mt-4 gap-8">
-              <DndContext onDragEnd={handleDragEnd}>
-                {filteredColumns.map((column) => (
+          {/* Task Columns */}
+          <DndContext onDragEnd={handleDragEnd}>
+            <div className="flex gap-4">
+              {filteredColumns.map((column) => {
+                const tasksInColumn = filteredTasks.filter(
+                  (task) => task.status === column.id
+                );
+                return (
                   <Column
                     key={column.id}
                     column={column}
-                    tasks={tasks.filter((task) => task.status === column.id)}
+                    tasks={tasksInColumn}
+                    onDeleteTask={handleDeleteTask}
                   />
-                ))}
-              </DndContext>
+                );
+              })}
             </div>
-          </div>
+          </DndContext>
         </div>
       </div>
     </div>
